@@ -33,6 +33,11 @@ nix = { version = "0.29.0", features = ["user", "process"]}
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-service = "0.8.0"
+windows = { version = "0.62.2", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_Threading"
+] }
 
 [dev-dependencies]
 jsonschema = "0.30.0"

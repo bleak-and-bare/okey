@@ -1,11 +1,13 @@
 use std::{env, fs, io, path::Path};
 
-use anyhow::{Result, anyhow};
-use nix::unistd;
+use anyhow::{anyhow, Result};
 
 use crate::config::schema::Config;
 
+#[cfg(target_os = "linux")]
 pub fn get_config_dir_path() -> Result<String> {
+    use nix::unistd;
+
     if unistd::geteuid().is_root() {
         Ok("/etc/okey".to_string())
     } else {
@@ -15,6 +17,52 @@ pub fn get_config_dir_path() -> Result<String> {
 
         Ok(default_path_str)
     }
+}
+
+#[cfg(target_os = "windows")]
+fn is_admin() -> bool {
+    unsafe {
+        use windows::Win32::{
+            Foundation::HANDLE,
+            Security::{GetTokenInformation, TokenElevation, TOKEN_ELEVATION, TOKEN_QUERY},
+            System::Threading::{GetCurrentProcess, OpenProcessToken},
+        };
+
+        let mut token = HANDLE::default();
+
+        if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token).is_err() {
+            return false;
+        }
+
+        let mut elevation = TOKEN_ELEVATION::default();
+        let mut size = 0;
+
+        if GetTokenInformation(
+            token,
+            TokenElevation,
+            Some(&mut elevation as *mut _ as *mut _),
+            std::mem::size_of::<TOKEN_ELEVATION>() as u32,
+            &mut size,
+        )
+        .is_err()
+        {
+            return false;
+        }
+
+        elevation.TokenIsElevated != 0
+    }
+}
+
+#[cfg(target_os = "windows")]
+pub fn get_config_dir_path() -> Result<String> {
+    // TODO : Update Readme about this
+    let base_path = if is_admin() {
+        env::var("PROGRAMDATA")?
+    } else {
+        env::var("APPDATA")?
+    };
+
+    Ok(Path::new(&base_path).join("Okey").to_string_lossy().to_string())
 }
 
 pub fn get_default_config_path() -> Result<String> {

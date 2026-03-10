@@ -13,7 +13,6 @@ use windows_service::{
 };
 
 const SERVICE_NAME: &'static str = "Okey Service";
-const ERR_SERVICE_DOES_NOT_EXIST: i32 = 1060;
 
 pub fn install() -> Result<()> {
     let request_access = ServiceManagerAccess::CONNECT | ServiceManagerAccess::CREATE_SERVICE;
