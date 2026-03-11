@@ -16,16 +16,23 @@ use super::SERVICE_NAME;
 define_windows_service!(ffi_service_main, service_main);
 
 fn run_service() -> Result<()> {
+    // Reference : https://learn.microsoft.com/en-us/windows/win32/services/service-status-transitions
+    let (tx, rx) = std::sync::mpsc::channel();
+
     let event_handler = move |control_event| -> ServiceControlHandlerResult {
         match control_event {
-            ServiceControl::Stop => ServiceControlHandlerResult::NoError,
+            ServiceControl::Stop => {
+                tx.send(()).ok();
+                ServiceControlHandlerResult::NoError
+            }
             ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
             _ => ServiceControlHandlerResult::NotImplemented,
         }
     };
 
     let status_handle = service_control_handler::register(SERVICE_NAME, event_handler)?;
-    let next_status = ServiceStatus {
+
+    let mut next_status = ServiceStatus {
         checkpoint: 0,
         controls_accepted: ServiceControlAccept::STOP | ServiceControlAccept::PAUSE_CONTINUE,
         current_state: ServiceState::Running,
@@ -35,7 +42,12 @@ fn run_service() -> Result<()> {
         wait_hint: Duration::default(),
     };
 
-    status_handle.set_service_status(next_status)?;
+    status_handle.set_service_status(next_status.clone())?;
+
+    rx.recv().unwrap();
+    next_status.current_state = ServiceState::Stopped;
+    next_status.controls_accepted = ServiceControlAccept::empty();
+    status_handle.set_service_status(next_status.clone())?;
 
     // do shit here
 

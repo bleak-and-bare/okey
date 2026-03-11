@@ -15,6 +15,8 @@ use windows_service::{
 
 use super::SERVICE_NAME;
 
+pub use super::win_execute::*;
+
 pub fn install() -> Result<()> {
     let request_access = ServiceManagerAccess::CONNECT | ServiceManagerAccess::CREATE_SERVICE;
     let service_manager = ServiceManager::local_computer(None::<&str>, request_access)?;
@@ -24,34 +26,47 @@ pub fn install() -> Result<()> {
         service_type: ServiceType::OWN_PROCESS,
         error_control: ServiceErrorControl::Normal,
         executable_path: std::env::current_exe()?,
-        launch_arguments: vec![OsString::from("execute")],
+        launch_arguments: vec![OsString::from("service"), OsString::from("execute")],
         account_name: None,
         account_password: None,
         dependencies: vec![],
         start_type: ServiceStartType::OnDemand, // service enabled but still has to be started in `msc`
     };
 
-    service_manager.create_service(&service_info, ServiceAccess::all())?;
-    println!("The windows service has been installed, run 'okey service start' to start it or start it with `services.msc`");
+    let service_access = ServiceAccess::START
+        | ServiceAccess::STOP
+        | ServiceAccess::DELETE
+        | ServiceAccess::QUERY_CONFIG
+        | ServiceAccess::QUERY_STATUS;
+    let service = service_manager.create_service(&service_info, service_access)?;
+
+    service.set_description("An advanced ready to use key remapper written in Rust.")?;
+    println!("The windows service has been installed, run 'okey service start' to start it or start it within `services.msc`");
 
     Ok(())
 }
 
-fn wait_for_stop_until(service: &Service, timeout: Duration) -> Result<bool> {
-    let start_wait = Instant::now();
+fn wait_for_stop_for(service: &Service, timeout: Duration) -> Result<bool> {
+    if let Ok(status) = service.query_status() {
+        if status.current_state != ServiceState::Stopped {
+            if service.stop().is_ok() {
+                let start_wait = Instant::now();
 
-    loop {
-        let status = service.query_status()?;
-        if status.current_state == ServiceState::Stopped {
-            break;
+                loop {
+                    let status = service.query_status()?;
+                    if status.current_state == ServiceState::Stopped {
+                        break;
+                    }
+
+                    if start_wait.elapsed() > timeout {
+                        println!("Waiting too long for service to stop.");
+                        return Ok(false);
+                    }
+
+                    sleep(Duration::from_millis(500));
+                }
+            }
         }
-
-        if start_wait.elapsed() > timeout {
-            println!("Failed to restart service. Waiting too long for service to stop.");
-            return Ok(false);
-        }
-
-        sleep(Duration::from_millis(500));
     }
 
     Ok(true)
@@ -63,11 +78,7 @@ pub fn uninstall() -> Result<()> {
 
     let service = manager.open_service(OsString::from(SERVICE_NAME), request_access)?;
 
-    service.stop()?;
-    if !wait_for_stop_until(&service, Duration::from_secs(30))? {
-        return Ok(());
-    }
-
+    wait_for_stop_for(&service, Duration::from_secs(30))?;
     service.delete()?;
     println!("The windows service has been removed");
 
@@ -78,7 +89,7 @@ pub fn start() -> Result<()> {
     let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::all())?;
 
     let service = manager.open_service(OsString::from(SERVICE_NAME), ServiceAccess::START)?;
-    service.start(&[])?;
+    service.start::<OsString>(&[])?;
 
     Ok(())
 }
@@ -97,16 +108,9 @@ pub fn restart() -> Result<()> {
     let service_access = ServiceAccess::START | ServiceAccess::STOP | ServiceAccess::QUERY_STATUS;
     let service = manager.open_service(SERVICE_NAME, service_access)?;
 
-    if let Ok(status) = service.query_status() {
-        if status.current_state != ServiceState::Stopped {
-            service.stop()?;
-            if !wait_for_stop_until(&service, Duration::from_secs(30))? {
-                return Ok(());
-            }
-        }
+    if wait_for_stop_for(&service, Duration::from_secs(30))? {
+        service.start::<OsString>(&[])?;
     }
-
-    service.start::<OsString>(&[])?;
 
     Ok(())
 }
@@ -135,10 +139,15 @@ fn service_start_type(config: &ServiceConfig) -> &'static str {
 
 pub fn status() -> Result<()> {
     let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
-    let service = manager.open_service(SERVICE_NAME, ServiceAccess::QUERY_STATUS)?;
+    let service = manager.open_service(
+        SERVICE_NAME,
+        ServiceAccess::QUERY_STATUS | ServiceAccess::QUERY_CONFIG,
+    )?;
 
     let status = service.query_status()?;
     let config = service.query_config()?;
+
+    // TODO : print something prettier
 
     println!("Service : {}", SERVICE_NAME);
     println!("Display name : {}", config.display_name.to_string_lossy());
