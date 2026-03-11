@@ -6,16 +6,14 @@ use std::{
 
 use anyhow::Result;
 use windows_service::{
-    define_windows_service,
     service::{
         Service, ServiceAccess, ServiceConfig, ServiceErrorControl, ServiceInfo, ServiceStartType,
         ServiceState, ServiceStatus, ServiceType,
     },
-    service_dispatcher,
     service_manager::{ServiceManager, ServiceManagerAccess},
 };
 
-const SERVICE_NAME: &'static str = "Okey Service";
+use super::SERVICE_NAME;
 
 pub fn install() -> Result<()> {
     let request_access = ServiceManagerAccess::CONNECT | ServiceManagerAccess::CREATE_SERVICE;
@@ -147,18 +145,5 @@ pub fn status() -> Result<()> {
     println!("State : {}", service_status_description(&status));
     println!("Start type : {}", service_start_type(&config));
 
-    Ok(())
-}
-
-define_windows_service!(ffi_service_main, service_main);
-
-fn service_main(_: Vec<OsString>) {
-    if let Err(err) = crate::cli::commands::start::start(None) {
-        eprintln!("Okey service exited with an error : {:?}", err);
-    }
-}
-
-pub fn execute() -> Result<()> {
-    service_dispatcher::start(SERVICE_NAME, ffi_service_main)?;
     Ok(())
 }
