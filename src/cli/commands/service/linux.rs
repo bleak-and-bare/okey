@@ -7,6 +7,10 @@ use crate::{cli::utils::systemctl, fs::service as fs};
 
 pub use systemctl::{restart, status, stop};
 
+pub fn execute() -> Result<()> {
+    // does nothing
+}
+
 pub fn start() -> Result<()> {
     let dir_path = fs::get_systemd_dir_path()?;
     let file_path = fs::resolve_service_file_path(&dir_path);

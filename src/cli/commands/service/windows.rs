@@ -6,9 +6,12 @@ use std::{
 
 use anyhow::Result;
 use windows_service::{
+    define_windows_service,
     service::{
-        ServiceAccess, ServiceErrorControl, ServiceInfo, ServiceStartType, ServiceState, ServiceStatus, ServiceType, ServiceConfig
+        Service, ServiceAccess, ServiceConfig, ServiceErrorControl, ServiceInfo, ServiceStartType,
+        ServiceState, ServiceStatus, ServiceType,
     },
+    service_dispatcher,
     service_manager::{ServiceManager, ServiceManagerAccess},
 };
 
@@ -23,7 +26,7 @@ pub fn install() -> Result<()> {
         service_type: ServiceType::OWN_PROCESS,
         error_control: ServiceErrorControl::Normal,
         executable_path: std::env::current_exe()?,
-        launch_arguments: vec![OsString::from("start")],
+        launch_arguments: vec![OsString::from("execute")],
         account_name: None,
         account_password: None,
         dependencies: vec![],
@@ -36,14 +39,38 @@ pub fn install() -> Result<()> {
     Ok(())
 }
 
+fn wait_for_stop_until(service: &Service, timeout: Duration) -> Result<bool> {
+    let start_wait = Instant::now();
+
+    loop {
+        let status = service.query_status()?;
+        if status.current_state == ServiceState::Stopped {
+            break;
+        }
+
+        if start_wait.elapsed() > timeout {
+            println!("Failed to restart service. Waiting too long for service to stop.");
+            return Ok(false);
+        }
+
+        sleep(Duration::from_millis(500));
+    }
+
+    Ok(true)
+}
+
 pub fn uninstall() -> Result<()> {
     let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::all())?;
-    let request_access = ServiceAccess::DELETE | ServiceAccess::STOP;
+    let request_access = ServiceAccess::DELETE | ServiceAccess::STOP | ServiceAccess::QUERY_STATUS;
 
     let service = manager.open_service(OsString::from(SERVICE_NAME), request_access)?;
-    service.stop()?;
-    service.delete()?;
 
+    service.stop()?;
+    if !wait_for_stop_until(&service, Duration::from_secs(30))? {
+        return Ok(());
+    }
+
+    service.delete()?;
     println!("The windows service has been removed");
 
     Ok(())
@@ -75,23 +102,8 @@ pub fn restart() -> Result<()> {
     if let Ok(status) = service.query_status() {
         if status.current_state != ServiceState::Stopped {
             service.stop()?;
-
-            let timeout = Duration::from_mins(1);
-            let start_wait = Instant::now();
-
-            loop {
-                // wait for service to stop
-                let status = service.query_status()?;
-                if status.current_state == ServiceState::Stopped {
-                    break;
-                }
-
-                if start_wait.elapsed() > timeout {
-                    println!("Failed to restart service. Waiting too long for service to stop.");
-                    return Ok(());
-                }
-
-                sleep(Duration::from_millis(500));
+            if !wait_for_stop_until(&service, Duration::from_secs(30))? {
+                return Ok(());
             }
         }
     }
@@ -110,7 +122,6 @@ fn service_status_description(status: &ServiceStatus) -> &'static str {
         ServiceState::ContinuePending => "continuing",
         ServiceState::PausePending => "pausing",
         ServiceState::Paused => "paused",
-        _ => "unknown",
     }
 }
 
@@ -126,8 +137,8 @@ fn service_start_type(config: &ServiceConfig) -> &'static str {
 
 pub fn status() -> Result<()> {
     let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
-    let service = manager.open_service(SERVICE_NAME, ServiceAccess::QUERY_STATUS)?;   
-    
+    let service = manager.open_service(SERVICE_NAME, ServiceAccess::QUERY_STATUS)?;
+
     let status = service.query_status()?;
     let config = service.query_config()?;
 
@@ -136,5 +147,18 @@ pub fn status() -> Result<()> {
     println!("State : {}", service_status_description(&status));
     println!("Start type : {}", service_start_type(&config));
 
+    Ok(())
+}
+
+define_windows_service!(ffi_service_main, service_main);
+
+fn service_main(_: Vec<OsString>) {
+    if let Err(err) = crate::cli::commands::start::start(None) {
+        eprintln!("Okey service exited with an error : {:?}", err);
+    }
+}
+
+pub fn execute() -> Result<()> {
+    service_dispatcher::start(SERVICE_NAME, ffi_service_main)?;
     Ok(())
 }

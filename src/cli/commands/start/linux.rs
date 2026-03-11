@@ -25,7 +25,7 @@ pub fn start_daemon(config_path: Option<String>) -> Result<()> {
             unistd::dup2(dev_null_fd, io::stdout().as_raw_fd())?;
             unistd::dup2(dev_null_fd, io::stderr().as_raw_fd())?;
 
-            start(config_path)?;
+            super::start(config_path)?;
         }
         Err(err) => Err(err)?,
     }

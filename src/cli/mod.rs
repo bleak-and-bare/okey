@@ -58,6 +58,9 @@ pub enum SystemdSubcommand {
     Install,
     /// Disable and remove the service file
     Uninstall,
+    #[command(hide = true)]
+    /// Execute windows service main
+    Execute,
 }
 
 #[derive(Parser, Debug)]

@@ -22,6 +22,7 @@ fn main() -> Result<()> {
             SystemdSubcommand::Status => commands::service::status(),
             SystemdSubcommand::Install => commands::service::install(),
             SystemdSubcommand::Uninstall => commands::service::uninstall(),
+            SystemdSubcommand::Execute => commands::service::execute(),
         },
 
         Command::Device { command } => match command {
