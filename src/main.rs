@@ -22,6 +22,8 @@ fn main() -> Result<()> {
             SystemdSubcommand::Status => commands::service::status(),
             SystemdSubcommand::Install => commands::service::install(),
             SystemdSubcommand::Uninstall => commands::service::uninstall(),
+
+            #[cfg(target_os = "windows")]
             SystemdSubcommand::Execute => commands::service::execute(),
         },
 

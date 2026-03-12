@@ -46,18 +46,55 @@ pub enum Command {
 
 #[derive(Parser, Debug)]
 pub enum SystemdSubcommand {
-    /// Shorthand for 'systemctl --user enable okey && systemctl --user start okey'
+    #[cfg_attr(
+        target_os = "windows",
+        doc = "Shorthand for 'sc start \"Okey Service\"'"
+    )]
+    #[cfg_attr(
+        target_family = "unix",
+        doc = "Shorthand for 'systemctl --user enable okey && systemctl --user start okey'"
+    )]
     Start,
-    /// Shorthand for 'systemctl --user stop okey && systemctl --user disable okey'
+
+    #[cfg_attr(
+        target_os = "windows",
+        doc = "Shorthand for 'sc stop \"Okey Service\"'"
+    )]
+    #[cfg_attr(
+        target_family = "unix",
+        doc = "Shorthand for 'systemctl --user stop okey && systemctl --user disable okey'"
+    )]
     Stop,
-    /// Shorthand for 'systemctl --user restart okey'
+
+    #[cfg_attr(
+        target_os = "windows",
+        doc = "Shorthand for 'sc stop \"Okey Service\" && sc start \"Okey Service\"'"
+    )]
+    #[cfg_attr(
+        target_family = "unix",
+        doc = "Shorthand for 'systemctl --user restart okey'"
+    )]
     Restart,
-    /// Shorthand for 'systemctl --user status okey'
+
+    #[cfg_attr(
+        target_os = "windows",
+        doc = "Shorthand for 'sc queryex \"Okey Service\"'"
+    )]
+    #[cfg_attr(
+        target_family = "unix",
+        doc = "Shorthand for 'systemctl --user status okey'"
+    )]
     Status,
-    /// Create the systemd service file
+
+    #[cfg_attr(target_os = "windows", doc = "Register to windows service manager")]
+    #[cfg_attr(target_family = "unix", doc = "Create the systemd service file")]
     Install,
-    /// Disable and remove the service file
+
+    #[cfg_attr(target_os = "windows", doc = "Disable and remove the service")]
+    #[cfg_attr(target_family = "unix", doc = "Disable and remove the service file")]
     Uninstall,
+
+    #[cfg(target_os = "windows")]
     #[command(hide = true)]
     /// Execute windows service main
     Execute,

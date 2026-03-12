@@ -1,5 +1,6 @@
 use std::{
     ffi::OsString,
+    process::Command,
     thread::sleep,
     time::{Duration, Instant},
 };
@@ -7,8 +8,8 @@ use std::{
 use anyhow::Result;
 use windows_service::{
     service::{
-        Service, ServiceAccess, ServiceConfig, ServiceErrorControl, ServiceInfo, ServiceStartType,
-        ServiceState, ServiceStatus, ServiceType,
+        Service, ServiceAccess, ServiceErrorControl, ServiceInfo, ServiceStartType,
+        ServiceState, ServiceType,
     },
     service_manager::{ServiceManager, ServiceManagerAccess},
 };
@@ -117,44 +118,9 @@ pub fn restart() -> Result<()> {
     Ok(())
 }
 
-fn service_status_description(status: &ServiceStatus) -> &'static str {
-    match status.current_state {
-        ServiceState::Stopped => "❌ stopped",
-        ServiceState::StartPending => "starting",
-        ServiceState::StopPending => "stopping",
-        ServiceState::Running => "🟢 running",
-        ServiceState::ContinuePending => "continuing",
-        ServiceState::PausePending => "pausing",
-        ServiceState::Paused => "paused",
-    }
-}
-
-fn service_start_type(config: &ServiceConfig) -> &'static str {
-    match config.start_type {
-        ServiceStartType::AutoStart => "automatic",
-        ServiceStartType::BootStart => "boot",
-        ServiceStartType::Disabled => "disabled",
-        ServiceStartType::OnDemand => "on demand",
-        ServiceStartType::SystemStart => "system",
-    }
-}
-
 pub fn status() -> Result<()> {
-    let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
-    let service = manager.open_service(
-        SERVICE_NAME,
-        ServiceAccess::QUERY_STATUS | ServiceAccess::QUERY_CONFIG,
-    )?;
-
-    let status = service.query_status()?;
-    let config = service.query_config()?;
-
-    // TODO : print something prettier
-
-    println!("Service : {}", SERVICE_NAME);
-    println!("Display name : {}", config.display_name.to_string_lossy());
-    println!("State : {}", service_status_description(&status));
-    println!("Start type : {}", service_start_type(&config));
-
+    Command::new("sc")
+        .args(["queryex", SERVICE_NAME])
+        .status()?;
     Ok(())
 }
