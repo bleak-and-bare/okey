@@ -11,8 +11,12 @@ const DETACHED_PROCESS: u32 = 0x00000008;
 
 pub fn start(_: Option<String>) -> Result<()> {
     println!("I am about to run an infinite loop");
+    let mut n = 0;
+
     loop {
-        std::thread::sleep(Duration::from_millis(500));
+        std::fs::write("C:\\Users\\asus\\Documents\\debug.txt", format!("n = {n}"))?;
+        std::thread::sleep(Duration::from_secs(2));
+        n += 2;
     }
 }
 

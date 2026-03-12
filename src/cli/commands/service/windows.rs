@@ -36,6 +36,8 @@ pub fn install() -> Result<()> {
     let service_access = ServiceAccess::START
         | ServiceAccess::STOP
         | ServiceAccess::DELETE
+        | ServiceAccess::INTERROGATE
+        | ServiceAccess::CHANGE_CONFIG
         | ServiceAccess::QUERY_CONFIG
         | ServiceAccess::QUERY_STATUS;
     let service = service_manager.create_service(&service_info, service_access)?;
