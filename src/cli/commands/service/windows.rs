@@ -1,18 +1,12 @@
-use std::{
-    ffi::OsString,
-    process::Command,
-    thread::sleep,
-    time::{Duration, Instant},
-};
+use std::{ffi::OsString, process::Command, time::Duration};
 
 use anyhow::Result;
 use windows_service::{
-    service::{
-        Service, ServiceAccess, ServiceErrorControl, ServiceInfo, ServiceStartType,
-        ServiceState, ServiceType,
-    },
+    service::*,
     service_manager::{ServiceManager, ServiceManagerAccess},
 };
+
+use crate::cli::utils::windows::wait_for_stop_for;
 
 use super::SERVICE_NAME;
 
@@ -47,32 +41,6 @@ pub fn install() -> Result<()> {
     println!("The windows service has been installed, run 'okey service start' to start it or start it within `services.msc`");
 
     Ok(())
-}
-
-fn wait_for_stop_for(service: &Service, timeout: Duration) -> Result<bool> {
-    if let Ok(status) = service.query_status() {
-        if status.current_state != ServiceState::Stopped {
-            if service.stop().is_ok() {
-                let start_wait = Instant::now();
-
-                loop {
-                    let status = service.query_status()?;
-                    if status.current_state == ServiceState::Stopped {
-                        break;
-                    }
-
-                    if start_wait.elapsed() > timeout {
-                        println!("Waiting too long for service to stop.");
-                        return Ok(false);
-                    }
-
-                    sleep(Duration::from_millis(500));
-                }
-            }
-        }
-    }
-
-    Ok(true)
 }
 
 pub fn uninstall() -> Result<()> {

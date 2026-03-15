@@ -62,7 +62,10 @@ pub fn get_config_dir_path() -> Result<String> {
         env::var("APPDATA")?
     };
 
-    Ok(Path::new(&base_path).join("Okey").to_string_lossy().to_string())
+    Ok(Path::new(&base_path)
+        .join("Okey")
+        .to_string_lossy()
+        .to_string())
 }
 
 pub fn get_default_config_path() -> Result<String> {
